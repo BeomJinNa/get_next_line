@@ -6,7 +6,7 @@
 /*   By: bena <bena@student.42seoul.kr>             +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2023/02/23 10:17:38 by bena              #+#    #+#             */
-/*   Updated: 2023/02/24 15:25:47 by bena             ###   ########.fr       */
+/*   Updated: 2023/02/24 16:04:31 by bena             ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -21,6 +21,7 @@ char		*init_buffer(int buffer_size);
 int			does_newline_exist(char *str, char **output);
 char		*extend_buffer(char *buf, int *size, char **used, char **ptr);
 void		set_pointers(char **ptr, void *address, int size);
+static char	*remove_buffer(char **buffer);
 
 char	*get_next_line(int fd)
 {
@@ -62,6 +63,8 @@ static char	*end_of_file(char **buffer)
 	while (*new_buffer)
 		new_buffer++;
 	length = new_buffer - *buffer;
+	if (length == 0)
+		return (remove_buffer(buffer));
 	new_buffer = (char *)malloc(sizeof(char) * (length + 1));
 	if (new_buffer != NULL)
 	{
@@ -102,4 +105,11 @@ static char	*get_the_line(char **buffer, char *end_of_line)
 	free(*buffer);
 	*buffer = residue_buffer;
 	return (new_buffer);
+}
+
+static char	*remove_buffer(char **buffer)
+{
+	free(*buffer);
+	*buffer = NULL;
+	return (NULL);
 }
