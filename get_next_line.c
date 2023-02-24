@@ -6,7 +6,7 @@
 /*   By: bena <bena@student.42seoul.kr>             +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2023/02/23 10:17:38 by bena              #+#    #+#             */
-/*   Updated: 2023/02/24 13:48:11 by bena             ###   ########.fr       */
+/*   Updated: 2023/02/24 15:25:47 by bena             ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -14,20 +14,22 @@
 #include <unistd.h>
 #include <limits.h>
 
-static char	*find_end_position(char *str);
 static char	*end_of_file(char **buffer);
 static char	*get_the_line(char **buffer, char *end_of_line);
+char		*find_end_position(char *str);
 char		*init_buffer(int buffer_size);
-int			does_newline_exist(char	**ptr);
+int			does_newline_exist(char *str, char **output);
 char		*extend_buffer(char *buf, int *size, char **used, char **ptr);
+void		set_pointers(char **ptr, void *address, int size);
 
 char	*get_next_line(int fd)
 {
-	static char	*buf[OPEN_MAX] = {(char *)&buf, };
+	static char	*buf[OPEN_MAX + 1] = {NULL, };
 	char		*buf_used;
 	char		*ptr;
 	int			buf_size;
 
+	set_pointers(buf, (void *)&buf, OPEN_MAX + 1);
 	buf_size = BUFFER_SIZE + 1;
 	if (buf[fd] == (char *)&buf)
 		buf[fd] = init_buffer(buf_size);
@@ -35,27 +37,18 @@ char	*get_next_line(int fd)
 		return (NULL);
 	ptr = buf[fd];
 	buf_used = find_end_position(buf[fd]);
-	while (does_newline_exist(&ptr) == 0)
+	while (does_newline_exist(ptr, &ptr) == 0)
 	{
-		if (buf_size < (buf_used - buf[fd]) + BUFFER_SIZE + 1)
+		if (buf_size < (buf_used - buf[fd]) + (BUFFER_SIZE + 1))
 			buf[fd] = extend_buffer(buf[fd], &buf_size, &buf_used, &ptr);
 		if (buf[fd] == NULL)
 			return (NULL);
 		if (read(fd, buf_used, BUFFER_SIZE) < BUFFER_SIZE)
-			return (end_of_file(&buf[fd]));
+			if (does_newline_exist(ptr, NULL) == 0)
+				return (end_of_file(&buf[fd]));
 		buf_used = find_end_position(buf_used);
 	}
 	return (get_the_line(&buf[fd], ptr));
-}
-
-static char	*find_end_position(char *str)
-{
-	char	*output;
-
-	output = str;
-	while (*output)
-		output++;
-	return (output);
 }
 
 static char	*end_of_file(char **buffer)

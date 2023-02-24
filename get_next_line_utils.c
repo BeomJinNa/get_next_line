@@ -6,11 +6,12 @@
 /*   By: bena <bena@student.42seoul.kr>             +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2023/02/23 10:18:17 by bena              #+#    #+#             */
-/*   Updated: 2023/02/24 13:48:46 by bena             ###   ########.fr       */
+/*   Updated: 2023/02/24 15:27:24 by bena             ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include <stdlib.h>
+#include <limits.h>
 
 char	*init_buffer(int buffer_size)
 {
@@ -24,11 +25,22 @@ char	*init_buffer(int buffer_size)
 	return (output);
 }
 
-int	does_newline_exist(char	**ptr)
+int	does_newline_exist(char *str, char **output)
 {
-	while (**ptr)
-		if (*(*ptr++) == '\n')
+	char	*ptr;
+
+	ptr = str;
+	while (*ptr)
+	{
+		if (*ptr++ == '\n')
+		{
+			if (output != NULL)
+				*output = ptr;
 			return (1);
+		}
+	}
+	if (output != NULL)
+		*output = ptr;
 	return (0);
 }
 
@@ -58,12 +70,17 @@ char	*extend_buffer(char *buf, int *size, char **used, char **ptr)
 	from = buf;
 	to = new_buffer;
 	while (*from)
-	{
-		*to++ = *from;
-		*from++ = '\0';
-	}
+		*to++ = *from++;
 	*used = new_buffer + (*used - buf);
 	*ptr = new_buffer + (*ptr - buf);
 	free(buf);
 	return (new_buffer);
+}
+
+void	set_pointers(char **ptr, void *address, int size)
+{
+	if (ptr[OPEN_MAX] != NULL)
+		return ;
+	while (size-- > 0)
+		*(ptr++) = address;
 }
