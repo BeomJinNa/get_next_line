@@ -6,81 +6,56 @@
 /*   By: bena <bena@student.42seoul.kr>             +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2023/02/23 10:18:17 by bena              #+#    #+#             */
-/*   Updated: 2023/02/24 15:27:24 by bena             ###   ########.fr       */
+/*   Updated: 2023/02/26 16:00:07 by bena             ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include <stdlib.h>
-#include <limits.h>
+#include "get_next_line.h"
 
-char	*init_buffer(int buffer_size)
+int	does_newline_exist(t_buf *node)
 {
-	char	*output;
-
-	output = (char *)malloc(sizeof(char) * buffer_size);
-	if (output == NULL)
-		return (NULL);
-	while (buffer_size-- > 0)
-		output[buffer_size] = '\0';
-	return (output);
-}
-
-int	does_newline_exist(char *str, char **output)
-{
-	char	*ptr;
-
-	ptr = str;
-	while (*ptr)
-	{
-		if (*ptr++ == '\n')
-		{
-			if (output != NULL)
-				*output = ptr;
+	while (node->scanner < node->buf_end)
+		if (*node->scanner++ == '\n')
 			return (1);
-		}
-	}
-	if (output != NULL)
-		*output = ptr;
 	return (0);
 }
 
-char	*find_end_position(char *str)
+char	*remove_node_gnl(t_buf **node_ptr)
 {
-	char	*output;
+	t_buf	*node;
 
-	output = str;
-	while (*output)
-		output++;
-	return (output);
+	node = *node_ptr;
+	node->before->next = node->next;
+	if (node->next != NULL)
+		node->next->before = node->before;
+	if (node->buf != NULL)
+		free(node->buf);
+	free(node);
+	*node_ptr = NULL;
+	return (NULL);
 }
 
-char	*extend_buffer(char *buf, int *size, char **used, char **ptr)
+void	extend_buffer(t_buf *node)
 {
 	char	*new_buffer;
 	char	*from;
 	char	*to;
+	size_t	length;
 
-	*size = ((*size - 1) << 1) + 1;
-	new_buffer = init_buffer(*size);
+	node->buf_size = ((node->buf_size - 1) << 1) + 1;
+	new_buffer = (char *)malloc(sizeof(char) * node->buf_size);
 	if (new_buffer == NULL)
 	{
-		free(buf);
-		return (NULL);
-	}
-	from = buf;
-	to = new_buffer;
-	while (*from)
-		*to++ = *from++;
-	*used = new_buffer + (*used - buf);
-	*ptr = new_buffer + (*ptr - buf);
-	free(buf);
-	return (new_buffer);
-}
-
-void	set_pointers(char **ptr, void *address, int size)
-{
-	if (ptr[OPEN_MAX] != NULL)
+		remove_node_gnl(&node);
 		return ;
-	while (size-- > 0)
-		*(ptr++) = address;
+	}
+	from = node->buf;
+	to = new_buffer;
+	length = node->buf_end - node->buf;
+	while (length-- > 0)
+		*to++ = *from++;
+	node->buf_end = new_buffer + (node->buf_end - node->buf);
+	node->scanner = new_buffer + (node->scanner - node->buf);
+	free(node->buf);
+	node->buf = new_buffer;
 }

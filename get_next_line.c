@@ -6,110 +6,110 @@
 /*   By: bena <bena@student.42seoul.kr>             +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2023/02/23 10:17:38 by bena              #+#    #+#             */
-/*   Updated: 2023/02/24 16:04:31 by bena             ###   ########.fr       */
+/*   Updated: 2023/02/26 17:53:40 by bena             ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include <stdlib.h>
-#include <unistd.h>
-#include <limits.h>
+#include "get_next_line.h"
 
-static char	*end_of_file(char **buffer);
-static char	*get_the_line(char **buffer, char *end_of_line);
-char		*find_end_position(char *str);
-char		*init_buffer(int buffer_size);
-int			does_newline_exist(char *str, char **output);
-char		*extend_buffer(char *buf, int *size, char **used, char **ptr);
-void		set_pointers(char **ptr, void *address, int size);
-static char	*remove_buffer(char **buffer);
+static t_buf	*get_node(int fd, t_buf *node);
+static char		*release_node(t_buf *node);
+static char		*extract_one_line(t_buf *node);
+static char		*create_buffer(size_t size);
+char			*remove_node_gnl(t_buf **node_ptr);
+int				does_newline_exist(t_buf *node);
+void			extend_buffer(t_buf *node);
 
 char	*get_next_line(int fd)
 {
-	static char	*buf[OPEN_MAX + 1] = {NULL, };
-	char		*buf_used;
-	char		*ptr;
-	int			buf_size;
+	static t_buf	list;
+	t_buf			*node;
 
-	set_pointers(buf, (void *)&buf, OPEN_MAX + 1);
-	buf_size = BUFFER_SIZE + 1;
-	if (buf[fd] == (char *)&buf)
-		buf[fd] = init_buffer(buf_size);
-	if (buf[fd] == NULL)
+	node = get_node(fd, &list);
+	if (node == NULL)
 		return (NULL);
-	ptr = buf[fd];
-	buf_used = find_end_position(buf[fd]);
-	while (does_newline_exist(ptr, &ptr) == 0)
+	node->scanner = node->buf;
+	while (does_newline_exist(node) == 0)
 	{
-		if (buf_size < (buf_used - buf[fd]) + (BUFFER_SIZE + 1))
-			buf[fd] = extend_buffer(buf[fd], &buf_size, &buf_used, &ptr);
-		if (buf[fd] == NULL)
+		if (node->buf_size < (node->buf_end - node->buf) + BUFFER_SIZE + 1)
+			extend_buffer(node);
+		if (node == NULL)
 			return (NULL);
-		if (read(fd, buf_used, BUFFER_SIZE) < BUFFER_SIZE)
-			if (does_newline_exist(ptr, NULL) == 0)
-				return (end_of_file(&buf[fd]));
-		buf_used = find_end_position(buf_used);
+		node->read_bytes = read(fd, node->buf_end, BUFFER_SIZE);
+		node->buf_end += node->read_bytes;
+		if (node->read_bytes < BUFFER_SIZE)
+			return (release_node(node));
 	}
-	return (get_the_line(&buf[fd], ptr));
+	return (extract_one_line(node));
 }
 
-static char	*end_of_file(char **buffer)
+static t_buf	*get_node(int fd, t_buf *node)
 {
+	while (node->next != NULL && (node->fd != fd || node->is_this_dynamic == 0))
+		node = node->next;
+	if (node->fd == fd && node->is_this_dynamic == 1)
+		return (node);
+	node->next = (t_buf *)malloc(sizeof(t_buf));
+	if (node->next == NULL)
+		return (NULL);
+	node->next->buf = create_buffer(BUFFER_SIZE + 1);
+	if (node->next->buf == NULL)
+		return ((t_buf *)remove_node_gnl(&node->next));
+	(node->next)->before = node;
+	node = node->next;
+	node->buf_end = node->buf;
+	node->scanner = node->buf;
+	node->buf_size = BUFFER_SIZE + 1;
+	node->fd = fd;
+	node->next = NULL;
+	node->is_this_dynamic = 1;
+	return (node);
+}
+
+static char	*release_node(t_buf *node)
+{
+	char	*output;
+
+	if (node->read_bytes < 0)
+		return (remove_node_gnl(&node));
+	output = extract_one_line(node);
+	if (output == NULL)
+		return (NULL);
+	return (output);
+}
+
+static char	*extract_one_line(t_buf *node)
+{
+	char	*new_buffer;
 	char	*from;
 	char	*to;
-	char	*new_buffer;
 	size_t	length;
 
-	new_buffer = *buffer;
-	while (*new_buffer)
-		new_buffer++;
-	length = new_buffer - *buffer;
+	length = 0;
+	if (node->scanner > node->buf)
+		if (*(node->scanner - 1) == '\n')
+			length = node->scanner - node->buf;
 	if (length == 0)
-		return (remove_buffer(buffer));
-	new_buffer = (char *)malloc(sizeof(char) * (length + 1));
-	if (new_buffer != NULL)
-	{
-		to = new_buffer;
-		from = *buffer;
-		while (*from)
-			*to++ = *from++;
-		*to = '\0';
-	}
-	free(*buffer);
-	*buffer = NULL;
+		does_newline_exist(node);
+	if (length == 0)
+		length = node->scanner - node->buf;
+	new_buffer = create_buffer(length + 1);
+	if (new_buffer == NULL)
+		return (remove_node_gnl(&node));
+	from = node->scanner;
+	to = new_buffer + length;
+	*to = '\0';
+	while (length-- > 0)
+		*--to = *--from;
+	while (node->scanner < node->buf_end)
+		*from++ = *node->scanner++;
+	node->buf_end = from;
 	return (new_buffer);
 }
 
-static char	*get_the_line(char **buffer, char *end_of_line)
+static char	*create_buffer(size_t size)
 {
-	char	*new_buffer;
-	char	*from;
-	char	*to;
-	size_t	length;
-	char	*residue_buffer;
-
-	length = end_of_line - *buffer;
-	new_buffer = (char *)malloc(sizeof(char) * (length + 1));
-	if (new_buffer != NULL)
-	{
-		to = new_buffer;
-		from = *buffer;
-		while (length-- > 0)
-			*to++ = *from++;
-		*to = '\0';
-	}
-	residue_buffer = init_buffer(BUFFER_SIZE + 1);
-	to = residue_buffer;
-	if (residue_buffer != NULL)
-		while (*from)
-			*to++ = *from++;
-	free(*buffer);
-	*buffer = residue_buffer;
-	return (new_buffer);
-}
-
-static char	*remove_buffer(char **buffer)
-{
-	free(*buffer);
-	*buffer = NULL;
-	return (NULL);
+	if (size <= 1)
+		return (NULL);
+	return ((char *)malloc(sizeof(char) * size));
 }
