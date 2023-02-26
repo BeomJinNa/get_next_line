@@ -6,18 +6,18 @@
 /*   By: bena <bena@student.42seoul.kr>             +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2023/02/23 10:17:38 by bena              #+#    #+#             */
-/*   Updated: 2023/02/26 19:22:15 by bena             ###   ########.fr       */
+/*   Updated: 2023/02/26 19:42:55 by bena             ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "get_next_line_bonus.h"
 
+char	*remove_node_gnl(t_buf **node_ptr);
+int		does_newline_exist_gnl(t_buf *node);
+char	*create_buffer_gnl(size_t size);
 t_buf	*get_node(int fd, t_buf *node);
 char	*release_node(t_buf *node);
 char	*extract_one_line(t_buf *node);
-char	*create_buffer(size_t size);
-char	*remove_node_gnl(t_buf **node_ptr);
-int		does_newline_exist(t_buf *node);
 void	extend_buffer(t_buf *node);
 
 char	*get_next_line(int fd)
@@ -29,7 +29,7 @@ char	*get_next_line(int fd)
 	if (node == NULL)
 		return (NULL);
 	node->scanner = node->buf;
-	while (does_newline_exist(node) == 0)
+	while (does_newline_exist_gnl(node) == 0)
 	{
 		if (node->buf_size < (node->buf_end - node->buf) + BUFFER_SIZE + 1)
 			extend_buffer(node);
@@ -52,7 +52,7 @@ t_buf	*get_node(int fd, t_buf *node)
 	node->next = (t_buf *)malloc(sizeof(t_buf));
 	if (node->next == NULL)
 		return (NULL);
-	node->next->buf = create_buffer(BUFFER_SIZE + 1);
+	node->next->buf = create_buffer_gnl(BUFFER_SIZE + 1);
 	if (node->next->buf == NULL)
 		return ((t_buf *)remove_node_gnl(&node->next));
 	(node->next)->before = node;
@@ -90,10 +90,10 @@ char	*extract_one_line(t_buf *node)
 		if (*(node->scanner - 1) == '\n')
 			length = node->scanner - node->buf;
 	if (length == 0)
-		does_newline_exist(node);
+		does_newline_exist_gnl(node);
 	if (length == 0)
 		length = node->scanner - node->buf;
-	new_buffer = create_buffer(length + 1);
+	new_buffer = create_buffer_gnl(length + 1);
 	if (new_buffer == NULL)
 		return (remove_node_gnl(&node));
 	from = node->scanner;
@@ -107,9 +107,27 @@ char	*extract_one_line(t_buf *node)
 	return (new_buffer);
 }
 
-char	*create_buffer(size_t size)
+void	extend_buffer(t_buf *node)
 {
-	if (size <= 1)
-		return (NULL);
-	return ((char *)malloc(sizeof(char) * size));
+	char	*new_buffer;
+	char	*from;
+	char	*to;
+	size_t	length;
+
+	node->buf_size = ((node->buf_size - 1) << 1) + 1;
+	new_buffer = (char *)malloc(sizeof(char) * node->buf_size);
+	if (new_buffer == NULL)
+	{
+		remove_node_gnl(&node);
+		return ;
+	}
+	from = node->buf;
+	to = new_buffer;
+	length = node->buf_end - node->buf;
+	while (length-- > 0)
+		*to++ = *from++;
+	node->buf_end = new_buffer + (node->buf_end - node->buf);
+	node->scanner = new_buffer + (node->scanner - node->buf);
+	free(node->buf);
+	node->buf = new_buffer;
 }
